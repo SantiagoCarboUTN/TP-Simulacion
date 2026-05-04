@@ -3,6 +3,7 @@ TP 1.1 - Simulación de una Ruleta Europea (0-36)
 Universidad Tecnológica Nacional - FRRO
 Uso: python ruleta.py -c <corridas> -n <tiradas> -e <número_elegido>
 Ejemplo: python ruleta.py -c 5 -n 1000 -e 7
+INSTALACION DEPENDENCIAS:  pip install numpy matplotlib
 """
 
 import argparse
@@ -111,7 +112,7 @@ def graficar_corrida_unica(tiradas_eje, datos, n_elegido, n_tiradas, idx_corrida
     ax.plot(tiradas_eje, vvn, color="red", linewidth=0.9,
             label=f"vvn del número {n_elegido} (simulado)")
     ax.axhline(VVE_X, color="blue", linewidth=2,
-               label=f"vve = p·(1−p) ≈ {VVE_X:.5f}")
+              label=f"vve = p·(1−p) ≈ {VVE_X:.5f}")
     ax.set_xlabel("n  (número de tiradas)")
     ax.set_ylabel("vv  (valor de la varianza)")
     ax.set_title(f"Varianza del número {n_elegido}")
@@ -150,7 +151,7 @@ def graficar_multicorridas(tiradas_eje, todas_frn, todas_vpn,
                     linewidth=0.7, alpha=0.85,
                     label=f"Corrida {c + 1}")
         ax.axhline(esperado, color="black", linewidth=2.2,
-                   linestyle="--", label=label_esp, zorder=5)
+                  linestyle="--", label=label_esp, zorder=5)
         ax.set_xlabel("n  (número de tiradas)")
         ax.set_ylabel(ylabel_short)
         ax.set_title(titulo)
@@ -164,7 +165,7 @@ def graficar_multicorridas(tiradas_eje, todas_frn, todas_vpn,
 
 
 def imprimir_resumen(n_corridas, n_tiradas, n_elegido,
-                     todas_frn, todas_vpn, todas_vdn, todas_vvn):
+                    todas_frn, todas_vpn, todas_vdn, todas_vvn):
     sep = "=" * 55
     print(f"\n{sep}")
     print("  SIMULACIÓN RULETA EUROPEA (0 – 36)")
@@ -226,17 +227,17 @@ def main():
 
         # Gráficas individuales por corrida
         graficar_corrida_unica(tiradas_eje,
-                               (frn, vpn, vdn, vvn),
-                               n_elegido, n_tiradas, idx_corrida=c)
+                              (frn, vpn, vdn, vvn),
+                              n_elegido, n_tiradas, idx_corrida=c)
 
     # Gráfica con todas las corridas superpuestas
     graficar_multicorridas(tiradas_eje,
-                           todas_frn, todas_vpn, todas_vdn, todas_vvn,
-                           n_elegido, n_tiradas, n_corridas)
+                          todas_frn, todas_vpn, todas_vdn, todas_vvn,
+                          n_elegido, n_tiradas, n_corridas)
 
     imprimir_resumen(n_corridas, n_tiradas, n_elegido,
-                     todas_frn, todas_vpn, todas_vdn, todas_vvn)
+                    todas_frn, todas_vpn, todas_vdn, todas_vvn)
 
 
 if __name__ == "__main__":
-    main()
+  main()
