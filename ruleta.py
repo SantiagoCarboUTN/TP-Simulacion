@@ -4,6 +4,8 @@ Universidad Tecnológica Nacional - FRRO
 Uso: python ruleta.py -c <corridas> -n <tiradas> -e <número_elegido>
 Ejemplo: python ruleta.py -c 5 -n 1000 -e 7
 INSTALACION DEPENDENCIAS:  pip install numpy matplotlib
+
+
 """
 
 import argparse
@@ -11,7 +13,6 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-
 
 # ──────────────────────────────────────────────
 # Valores teóricos esperados (ruleta europea 0-36)
@@ -23,7 +24,6 @@ VVE_TOTAL = sum((i - VPE) ** 2 for i in NUMEROS) / 37  # varianza total ≈ 114.
 VDE_TOTAL = np.sqrt(VVE_TOTAL)     # desvío estándar total ≈ 10.677
 VVE_X = P * (1 - P)               # varianza de Bernoulli para el número elegido
 VDE_X = np.sqrt(VVE_X)            # desvío estándar de Bernoulli
-
 
 def simular_corrida(n_tiradas: int, n_elegido: int):
     """
@@ -44,9 +44,9 @@ def simular_corrida(n_tiradas: int, n_elegido: int):
         tirada = random.randint(0, 36)
         resultados.append(tirada)
 
-        hit = 1 if tirada == n_elegido else 0
-        indicador.append(hit)
-        cuenta += hit
+        acierto = 1 if tirada == n_elegido else 0
+        indicador.append(acierto)
+        cuenta += acierto
 
         # Frecuencia relativa acumulada del número elegido
         frn.append(cuenta / i)
@@ -80,17 +80,17 @@ def graficar_corrida_unica(tiradas_eje, datos, n_elegido, n_tiradas, idx_corrida
     ax = axes[0, 0]
     ax.plot(tiradas_eje, frn, color="red", linewidth=0.9, label="frn (simulado)")
     ax.axhline(P, color="blue", linewidth=2,
-               label=f"fre = 1/37 ≈ {P:.5f}")
+              label=f"fre = 1/37 ≈ {P:.5f}")
     ax.set_xlabel("n  (número de tiradas)")
     ax.set_ylabel("fr  (frecuencia relativa)")
     ax.set_title(f"Frecuencia Relativa del número {n_elegido}")
     ax.legend(fontsize=9); ax.grid(True, alpha=0.3)
-
+ 
     # ── Gráfica 2: Valor Promedio ──
     ax = axes[0, 1]
     ax.plot(tiradas_eje, vpn, color="red", linewidth=0.9, label="vpn (simulado)")
     ax.axhline(VPE, color="blue", linewidth=2,
-               label=f"vpe = {VPE:.2f}")
+              label=f"vpe = {VPE:.2f}")
     ax.set_xlabel("n  (número de tiradas)")
     ax.set_ylabel("vp  (valor promedio de las tiradas)")
     ax.set_title("Valor Promedio de las Tiradas")
@@ -101,7 +101,7 @@ def graficar_corrida_unica(tiradas_eje, datos, n_elegido, n_tiradas, idx_corrida
     ax.plot(tiradas_eje, vdn, color="red", linewidth=0.9,
             label=f"vd del número {n_elegido} (simulado)")
     ax.axhline(VDE_X, color="blue", linewidth=2,
-               label=f"vde = √(p·(1−p)) ≈ {VDE_X:.5f}")
+              label=f"vde = √(p·(1−p)) ≈ {VDE_X:.5f}")
     ax.set_xlabel("n  (número de tiradas)")
     ax.set_ylabel("vd  (valor del desvío)")
     ax.set_title(f"Desvío Estándar del número {n_elegido}")
@@ -131,38 +131,42 @@ def graficar_multicorridas(tiradas_eje, todas_frn, todas_vpn,
     colores = plt.cm.tab10.colors
     fig, axes = plt.subplots(2, 2, figsize=(13, 9))
     fig.suptitle(
-        f"Simulación Ruleta Europea  –  {n_corridas} corridas superpuestas  |  "
-        f"n = {n_tiradas} tiradas  |  Número elegido: {n_elegido}",
+        f"Simulación Ruleta Europea – {n_corridas} corridas | n={n_tiradas} | Número elegido: {n_elegido}",
         fontsize=13, fontweight="bold"
     )
 
-    configs = [
-        (todas_frn,  P,      "fr", "frn", f"fre = {P:.5f}",    f"Frecuencia Relativa del número {n_elegido}"),
-        (todas_vpn,  VPE,    "vp", "vpn", f"vpe = {VPE:.2f}",  "Valor Promedio de las Tiradas"),
-        (todas_vdn,  VDE_X,  "vd", "vdn", f"vde ≈ {VDE_X:.5f}", f"Desvío Estándar del número {n_elegido}"),
-        (todas_vvn,  VVE_X,  "vv", "vvn", f"vve ≈ {VVE_X:.5f}", f"Varianza del número {n_elegido}"),
-    ]
+    ax1, ax2, ax3, ax4 = axes.flat
 
-    for ax, (datos_corridas, esperado, ylabel_short, label_sim, label_esp, titulo) \
-            in zip(axes.flat, configs):
-        for c, datos in enumerate(datos_corridas):
-            ax.plot(tiradas_eje, datos,
-                    color=colores[c % len(colores)],
-                    linewidth=0.7, alpha=0.85,
-                    label=f"Corrida {c + 1}")
-        ax.axhline(esperado, color="black", linewidth=2.2,
-                  linestyle="--", label=label_esp, zorder=5)
+    for c in range(n_corridas):
+        color = colores[c % len(colores)]
+        label = f"Corrida {c + 1}"
+        ax1.plot(tiradas_eje, todas_frn[c], color=color, linewidth=0.7, alpha=0.85, label=label)
+        ax2.plot(tiradas_eje, todas_vpn[c], color=color, linewidth=0.7, alpha=0.85, label=label)
+        ax3.plot(tiradas_eje, todas_vdn[c], color=color, linewidth=0.7, alpha=0.85, label=label)
+        ax4.plot(tiradas_eje, todas_vvn[c], color=color, linewidth=0.7, alpha=0.85, label=label)
+
+    # Líneas de valores esperados
+    ax1.axhline(P,     color="black", linewidth=2, linestyle="--", label=f"fre = {P:.5f}")
+    ax2.axhline(VPE,   color="black", linewidth=2, linestyle="--", label=f"vpe = {VPE:.2f}")
+    ax3.axhline(VDE_X, color="black", linewidth=2, linestyle="--", label=f"vde ≈ {VDE_X:.5f}")
+    ax4.axhline(VVE_X, color="black", linewidth=2, linestyle="--", label=f"vve ≈ {VVE_X:.5f}")
+
+    # Títulos y etiquetas
+    ax1.set_title(f"Frecuencia Relativa del número {n_elegido}")
+    ax2.set_title("Valor Promedio de las Tiradas")
+    ax3.set_title(f"Desvío Estándar del número {n_elegido}")
+    ax4.set_title(f"Varianza del número {n_elegido}")
+
+    for ax in axes.flat:
         ax.set_xlabel("n  (número de tiradas)")
-        ax.set_ylabel(ylabel_short)
-        ax.set_title(titulo)
-        ax.legend(fontsize=7.5); ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=7.5)
+        ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     fname = "graficas_multicorridas.png"
     plt.savefig(fname, dpi=150, bbox_inches="tight")
     print(f"  [✓] Guardado: {fname}")
     plt.close()
-
 
 def imprimir_resumen(n_corridas, n_tiradas, n_elegido,
                     todas_frn, todas_vpn, todas_vdn, todas_vvn):
@@ -175,7 +179,7 @@ def imprimir_resumen(n_corridas, n_tiradas, n_elegido,
     print(f"\n  --- Valores Teóricos Esperados ---")
     print(f"  Frecuencia relativa esperada  : {P:.6f}  (1/37)")
     print(f"  Valor promedio esperado        : {VPE:.4f}")
-    print(f"  Varianza (indicador X) esperada: {VVE_X:.6f}  (p·(1−p))")
+    print(f"  Varianza (indicador X) esperada: {VVE_X:.6f}  (p·(1−p))")    #:.6f sirve para redondear en 6 decimales
     print(f"  Desvío  (indicador X) esperado : {VDE_X:.6f}")
     print(f"\n  --- Valores Simulados (última corrida) ---")
     print(f"  Frecuencia relativa simulada   : {todas_frn[-1][-1]:.6f}")
@@ -183,7 +187,6 @@ def imprimir_resumen(n_corridas, n_tiradas, n_elegido,
     print(f"  Varianza simulada               : {todas_vvn[-1][-1]:.6f}")
     print(f"  Desvío simulado                 : {todas_vdn[-1][-1]:.6f}")
     print(sep)
-
 
 # ──────────────────────────────────────────────
 # MAIN
@@ -237,7 +240,6 @@ def main():
 
     imprimir_resumen(n_corridas, n_tiradas, n_elegido,
                     todas_frn, todas_vpn, todas_vdn, todas_vvn)
-
-
+    
 if __name__ == "__main__":
   main()
