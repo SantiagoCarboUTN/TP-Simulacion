@@ -4,14 +4,8 @@ Universidad Tecnologica Nacional - FRRO
 
 TIPOS DE APUESTA (-t):
   c   color      rojo(r) / negro(k)              18 nums  pago 1:1
-  pi  par/impar  par(p) / impar(i)               18 nums  pago 1:1
-  mi  mitad      falta 1-18(f) / pasa 19-36(s)   18 nums  pago 1:1
   d   docena     1ra(1) / 2da(2) / 3ra(3)        12 nums  pago 2:1
   col columna    1ra(1) / 2da(2) / 3ra(3)        12 nums  pago 2:1
-  se  seisena    numero inicial de la seisena     6 nums   pago 5:1
-  cu  cuadro     numero esquina inf-izq           4 nums   pago 8:1
-  tr  transversal numero inicial de la fila       3 nums   pago 11:1
-  ca  caballo    par de numeros "X-Y"             2 nums   pago 17:1
   n   pleno      numero exacto 0..36              1 num    pago 35:1
 
 Uso:
@@ -54,14 +48,8 @@ COLUMNA = {1: set(range(1,37,3)), 2: set(range(2,37,3)), 3: set(range(3,37,3))}
 # ═══════════════════════════════════════════════════════
 TIPOS_APUESTA = {
     'c'  : {'nombre': 'Color',        'pago': 1,  'prob': 18/37,  'cubre': 18},
-    'pi' : {'nombre': 'Par/Impar',    'pago': 1,  'prob': 18/37,  'cubre': 18},
-    'mi' : {'nombre': 'Mitad',        'pago': 1,  'prob': 18/37,  'cubre': 18},
     'd'  : {'nombre': 'Docena',       'pago': 2,  'prob': 12/37,  'cubre': 12},
     'col': {'nombre': 'Columna',      'pago': 2,  'prob': 12/37,  'cubre': 12},
-    'se' : {'nombre': 'Seisena',      'pago': 5,  'prob':  6/37,  'cubre':  6},
-    'cu' : {'nombre': 'Cuadro',       'pago': 8,  'prob':  4/37,  'cubre':  4},
-    'tr' : {'nombre': 'Transversal',  'pago': 11, 'prob':  3/37,  'cubre':  3},
-    'ca' : {'nombre': 'Caballo',      'pago': 17, 'prob':  2/37,  'cubre':  2},
     'n'  : {'nombre': 'Pleno',        'pago': 35, 'prob':  1/37,  'cubre':  1},
 }
 
@@ -72,34 +60,11 @@ TIPOS_APUESTA = {
 def numeros_ganadores(tipo, eleccion):
     """Retorna el conjunto de numeros que hacen ganar esta apuesta."""
     if tipo == 'c':
-        return ROJOS if eleccion == 'r' else NEGROS
-    if tipo == 'pi':
         return PARES if eleccion == 'p' else IMPARES
-    if tipo == 'mi':
-        return set(range(1,19)) if eleccion == 'f' else set(range(19,37))
     if tipo == 'd':
         return DOCENA[int(eleccion)]
     if tipo == 'col':
         return COLUMNA[int(eleccion)]
-    if tipo == 'se':
-        # seisena: 6 numeros a partir del primero de dos filas consecutivas
-        # filas: 1-3, 4-6, 7-9 ... el usuario pasa el primer numero
-        inicio = int(eleccion)
-        return set(range(inicio, inicio + 6))
-    if tipo == 'cu':
-        # cuadro: 4 numeros. El usuario pasa el inferior-izquierdo (n)
-        # los 4 son n, n+1, n+3, n+4  (disposicion en tapete 3 columnas)
-        n = int(eleccion)
-        return {n, n+1, n+3, n+4}
-    if tipo == 'tr':
-        # transversal: 3 numeros de una fila horizontal
-        # filas: 1-2-3, 4-5-6, 7-8-9 ...  usuario pasa el primero
-        inicio = int(eleccion)
-        return set(range(inicio, inicio + 3))
-    if tipo == 'ca':
-        # caballo: 2 numeros adyacentes, usuario pasa "X-Y"
-        partes = eleccion.split('-')
-        return {int(partes[0]), int(partes[1])}
     if tipo == 'n':
         return {int(eleccion)}
     raise ValueError(f"Tipo de apuesta desconocido: {tipo}")
@@ -148,6 +113,7 @@ def apostar_fibonacci(historial, base, pago):
     """
     Secuencia Fibonacci escalada por base.
     Avanza 1 lugar por perdida, retrocede 2 por victoria.
+    Lo que hace es al perder multiplicar la base por el correspondiente nro de la sucesion fibbonacci. Si ganas retrocedes 2 lugares en la sucesion 
     """
     fib = [1, 1]
     while fib[-1] < 100000:
@@ -311,31 +277,8 @@ def validar_eleccion(tipo, eleccion):
     """Lanza SystemExit con mensaje claro si la eleccion es invalida."""
     if tipo == 'c'   and eleccion not in ('r','k'):
         sys.exit("[ERROR] -t c requiere -e r (rojo) o -e k (negro)")
-    if tipo == 'pi'  and eleccion not in ('p','i'):
-        sys.exit("[ERROR] -t pi requiere -e p (par) o -e i (impar)")
-    if tipo == 'mi'  and eleccion not in ('f','s'):
-        sys.exit("[ERROR] -t mi requiere -e f (falta 1-18) o -e s (pasa 19-36)")
     if tipo in ('d','col') and eleccion not in ('1','2','3'):
         sys.exit(f"[ERROR] -t {tipo} requiere -e 1, 2 o 3")
-    if tipo == 'se':
-        v = int(eleccion)
-        if v not in range(1,32,3):   # 1,4,7,...31
-            sys.exit("[ERROR] -t se: inicio de seisena invalido (use 1,4,7,10,...31)")
-    if tipo == 'cu':
-        v = int(eleccion)
-        # primer num de cuadro valido: no puede estar en col 3 ni en fila 12
-        if v not in [n for n in range(1,34) if n%3 != 0 and n <= 32]:
-            sys.exit("[ERROR] -t cu: esquina de cuadro invalida")
-    if tipo == 'tr':
-        v = int(eleccion)
-        if v not in range(1,35,3):   # 1,4,7,...34
-            sys.exit("[ERROR] -t tr: inicio de fila invalido (use 1,4,7,...34)")
-    if tipo == 'ca':
-        try:
-            a, b = eleccion.split('-')
-            int(a); int(b)
-        except Exception:
-            sys.exit("[ERROR] -t ca requiere -e X-Y  ej: -e 8-9")
     if tipo == 'n':
         try:
             assert 0 <= int(eleccion) <= 36
