@@ -1,0 +1,610 @@
+\documentclass{article}
+\usepackage{arxiv}
+% ── Paquetes ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{url}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\geometry{a4paper, margin=2.5cm}
+
+% ── Estilo de código Python ───────────────────────────────────────────────────
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{orange},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8}
+}
+% ─────────────────────────────────────────────────────────────────────────────
+\title{TP 2.1 --- GENERADORES PSEUDOALEATORIOS}
+
+\author{
+  Santiago Carbó \\
+  Universidad Tecnológica Nacional | FRRO\\
+  Zeballos 1341, Rosario, Santa Fe  \\
+  \texttt{santiago.carbo05@gmail.com} \\
+  \And
+  Luca Gritti \\
+  Universidad Tecnológica Nacional | FRRO\\
+  Zeballos 1341, Rosario, Santa Fe \\
+  \texttt{lucagritti24@gmail.com} \\
+  \And
+  Valentín Cotorruelo \\
+  Universidad Tecnológica Nacional | FRRO\\
+  Zeballos 1341, Rosario, Santa Fe  \\
+  \texttt{valentincotorruelo@gmail.com} \\
+  \And
+  Felipe Sosa Bianciotto \\
+  Universidad Tecnológica Nacional | FRRO\\
+  Zeballos 1341, Rosario, Santa Fe  \\
+  \texttt{felipesosabianciotto@gmail.com} \\
+  \And
+  Felipe Muntaabski \\
+  Universidad Tecnológica Nacional | FRRO\\
+  Zeballos 1341, Rosario, Santa Fe  \\
+  \texttt{felipemuntaabski@gmail.com} \\
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+El presente trabajo implementa y evalúa tres generadores de números
+pseudoaleatorios en Python\,3: el método de los \textbf{Cuadrados Medios}
+(Von Neumann), el \textbf{Generador Congruencial Lineal} (GCL, parámetros
+glibc/POSIX) y el \textbf{Mersenne Twister} incluido en la biblioteca
+estándar de Python.  Sobre cada generador se aplica una batería de cinco
+pruebas estadísticas — Chi-cuadrado, Kolmogorov-Smirnov, Rachas,
+Autocorrelación y Póker — para evaluar su uniformidad e independencia.
+Los resultados muestran que el GCL y el Mersenne Twister superan todos los
+tests, mientras que los Cuadrados Medios fallan el test del Póker,
+evidenciando sus conocidas limitaciones en la distribución de dígitos.
+Se presentan gráficos comparativos de histogramas, ECDF, diagramas de
+dispersión serial y función de autocorrelación.
+
+\medskip
+\noindent\textbf{Palabras clave:}
+Simulación $\cdot$ Números pseudoaleatorios $\cdot$ GCL $\cdot$
+Cuadrados Medios $\cdot$ Mersenne Twister $\cdot$ Test Chi-cuadrado $\cdot$
+Kolmogorov-Smirnov $\cdot$ Test de Rachas $\cdot$ Autocorrelación
+\end{abstract}
+
+% ── 1. Introducción ───────────────────────────────────────────────────────────
+\section{Introducción}
+
+Un \emph{número pseudoaleatorio} es aquel generado por un proceso
+completamente determinista que, no obstante, produce secuencias que no
+exhiben ningún patrón o regularidad aparente desde un punto de vista
+estadístico~\cite{knuth1997}.  Ante las mismas condiciones iniciales
+(semilla), el algoritmo siempre reproduce exactamente la misma secuencia.
+Esta característica diferencia a los generadores \emph{pseudoaleatorios}
+de los generadores \emph{verdaderamente aleatorios}, que explotan fenómenos
+físicos impredecibles (ruido térmico, decaimiento radiactivo, etc.).
+
+La calidad de un generador pseudoaleatorio es determinante en la validez de
+cualquier simulación de Monte Carlo, ya que errores sistemáticos en la
+generación se propagan directamente a los estimadores obtenidos.  Por ello
+resulta imprescindible aplicar pruebas estadísticas formales que permitan
+aceptar o rechazar la hipótesis de que los números producidos se comportan
+como una muestra de una distribución uniforme $U[0,1)$ con observaciones
+independientes.
+
+Este trabajo implementa tres generadores representativos de distintas épocas
+y calidades:
+\begin{itemize}
+  \item \textbf{Cuadrados Medios} (Von Neumann, 1946): generador histórico,
+        de período típicamente corto.
+  \item \textbf{GCL} (Generador Congruencial Lineal, parámetros POSIX):
+        estándar en muchos sistemas durante décadas.
+  \item \textbf{Mersenne Twister} (MT19937, Python \texttt{random}):
+        referente moderno con período $2^{19937}-1$.
+\end{itemize}
+
+% ── 2. Generadores implementados ─────────────────────────────────────────────
+\section{Generadores de números pseudoaleatorios}
+
+\subsection{Método de los Cuadrados Medios}
+
+Propuesto por John von Neumann en 1946~\cite{metropolis1987}, es
+históricamente el primer generador pseudoaleatorio documentado.  A partir
+de una semilla $X_0$ de $d$ dígitos decimales, la recurrencia es:
+
+\begin{equation}
+  X_{n+1} = \text{dígitos centrales}\!\left(X_n^2,\; d\right)
+  \label{eq:cuadrados}
+\end{equation}
+
+La normalización a $[0,1)$ se obtiene como $U_n = X_n / 10^d$.
+El método presenta serias limitaciones: el período es generalmente muy
+corto y puede degenerar en ciclos triviales (por ejemplo, $X_n = 0$
+para todo $n$ si la semilla eleva al cuadrado dando cero en los dígitos
+centrales).  Se implementó con $d=8$ dígitos para maximizar su período
+dentro de las restricciones del método.
+
+\subsection{Generador Congruencial Lineal (GCL)}
+
+Introducido por D.\,H. Lehmer en 1949~\cite{lehmer1951}, el GCL es el
+generador pseudoaleatorio más ampliamente estudiado.  Su recurrencia es:
+
+\begin{equation}
+  X_{n+1} = (a \cdot X_n + c) \bmod m
+  \label{eq:gcl}
+\end{equation}
+
+con normalización $U_n = X_n / m \in [0,1)$.
+La elección de parámetros es crítica: según el \emph{Teorema de
+Hull-Dobell}~\cite{hull1962}, el período es máximo ($= m$) si y sólo si:
+\begin{enumerate}
+  \item $\gcd(c, m) = 1$,
+  \item $a \equiv 1 \pmod{p}$ para todo primo $p$ que divide a $m$,
+  \item si $4 \mid m$, entonces $a \equiv 1 \pmod{4}$.
+\end{enumerate}
+
+En este trabajo se utilizan los parámetros del estándar glibc/POSIX,
+que garantizan período completo:
+
+\begin{equation}
+  m = 2^{31},\quad a = 1\,103\,515\,245,\quad c = 12\,345
+  \label{eq:gcl_params}
+\end{equation}
+
+\subsection{Mersenne Twister (Python \texttt{random})}
+
+El Mersenne Twister (MT19937)~\cite{matsumoto1998} es el generador
+estándar de Python desde la versión~2.3.  Tiene las siguientes
+propiedades destacadas:
+
+\begin{itemize}
+  \item Período: $2^{19937} - 1 \approx 4.3 \times 10^{6001}$.
+  \item Equidistribución en 623 dimensiones.
+  \item Supera la mayoría de los tests estadísticos estándar.
+\end{itemize}
+
+Dado que su implementación interna no es parte del alcance de este trabajo,
+se usa como referencia de calidad mediante la función
+\texttt{random.random()} de la biblioteca estándar.
+
+% ── 3. Tests estadísticos ─────────────────────────────────────────────────────
+\section{Tests estadísticos}
+
+Se aplicaron cinco tests para evaluar \emph{uniformidad} e
+\emph{independencia} de cada generador, con un nivel de significación
+$\alpha = 0{,}05$ en todos los casos.  La hipótesis nula $H_0$ en cada test
+es que la muestra proviene de una distribución $U[0,1)$ con observaciones
+independientes.
+
+\subsection{Test de uniformidad Chi-cuadrado}
+
+Divide el intervalo $[0,1)$ en $k=10$ subintervalos iguales y compara las
+frecuencias observadas $O_i$ con la frecuencia esperada $E_i = n/k$:
+
+\begin{equation}
+  \chi^2 = \sum_{i=1}^{k} \frac{(O_i - E_i)^2}{E_i}
+  \label{eq:chi2}
+\end{equation}
+
+Bajo $H_0$, $\chi^2 \sim \chi^2(k-1)$.  El valor crítico para
+$k=10$, $\alpha=0{,}05$ es $\chi^2_{9;\,0{,}05} = 16{,}919$.
+
+\subsection{Test de Kolmogorov-Smirnov}
+
+Mide la máxima discrepancia entre la función de distribución empírica
+$F_n(x)$ y la teórica $F(x)=x$:
+
+\begin{equation}
+  D = \sup_{x \in [0,1)} \left| F_n(x) - x \right|
+  \label{eq:ks}
+\end{equation}
+
+El valor crítico aproximado para $\alpha=0{,}05$ es
+$D^* = 1{,}36/\sqrt{n}$~\cite{massey1951}.
+Para $n=1000$: $D^* \approx 0{,}04301$.
+
+\subsection{Test de Rachas}
+
+Evalúa la independencia de la secuencia contando el número de
+\emph{rachas} $R$ alrededor de la mediana muestral.  Bajo $H_0$ la
+distribución asintótica es normal:
+
+\begin{equation}
+  Z = \frac{R - \mathbb{E}[R]}{\sqrt{\mathrm{Var}[R]}},\qquad
+  \mathbb{E}[R] = \frac{2\,n_1\,n_2}{n_1+n_2}+1
+  \label{eq:rachas}
+\end{equation}
+
+donde $n_1$ y $n_2$ son los conteos por encima y por debajo de la mediana.
+Se rechaza $H_0$ si $|Z| > 1{,}96$.
+
+\subsection{Test de Autocorrelación}
+
+Calcula el coeficiente de correlación de Pearson entre $X_i$ y
+$X_{i+\ell}$ para un retardo $\ell=1$:
+
+\begin{equation}
+  r_\ell = \frac{\displaystyle\sum_{i=1}^{n-\ell}(X_i-\bar{X})(X_{i+\ell}-\bar{X})}{(n-\ell)\,s^2}
+  \label{eq:autocorr}
+\end{equation}
+
+Bajo $H_0$: $r_\ell \sim \mathcal{N}(0,\,1/(n-\ell))$, por lo que
+$Z = r_\ell \sqrt{n-\ell}$ tiene distribución $\mathcal{N}(0,1)$.
+Se rechaza $H_0$ si $|Z| > 1{,}96$.
+
+\subsection{Test del Póker}
+
+Agrupa los números en bloques de $d=5$, discretiza cada valor a un dígito
+decimal ($\lfloor 10\,U_i \rfloor$) y clasifica el bloque según cuántos
+valores distintos contiene, análogamente a las manos del póker.  Las
+probabilidades teóricas en base 10 son:
+
+\begin{table}[H]
+  \centering
+  \caption{Categorías y probabilidades teóricas del Test del Póker ($d=5$, base~10).}
+  \label{tab:poker}
+  \begin{tabular}{lcc}
+    \toprule
+    Categoría & Valores distintos & $p_{\text{teórica}}$ \\
+    \midrule
+    5 distintos & 5 & 0{,}30240 \\
+    Un par      & 4 & 0{,}50400 \\
+    Dos pares   & 3 & 0{,}10800 \\
+    Trío        & 3 & 0{,}07200 \\
+    Full        & 2 & 0{,}00900 \\
+    Póker       & 2 & 0{,}00450 \\
+    Quintilla   & 1 & 0{,}00010 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Las frecuencias observadas se comparan con las esperadas mediante un
+estadístico $\chi^2$ con $6$ grados de libertad; el valor crítico para
+$\alpha=0{,}05$ es $\chi^2_{6;\,0{,}05} = 12{,}592$.
+
+% ── 4. Resultados ─────────────────────────────────────────────────────────────
+\section{Resultados}
+
+Se generaron $n=1000$ números con cada generador usando semilla
+$X_0=12\,345$.  Los resultados numéricos de todos los tests se resumen en
+la Tabla~\ref{tab:resultados}.
+
+\begin{table}[H]
+  \centering
+  \caption{Resultados de los tests estadísticos ($n=1000$, $\alpha=0{,}05$).
+           ``Estadístico'' es el valor calculado; ``Crítico'' es el umbral
+           de rechazo.  \textbf{PASA}: no se rechaza $H_0$.  \textbf{FALLA}: se rechaza $H_0$.}
+  \label{tab:resultados}
+  \begin{tabular}{llcccc}
+    \toprule
+    Generador & Test & Estadístico & Crítico & G.L. & Resultado \\
+    \midrule
+    \multirow{5}{*}{Cuadrados Medios}
+      & Chi-cuadrado ($\chi^2$)    & 10{,}2000  & 16{,}919  & 9  & \textbf{PASA}  \\
+      & Kolmogorov-Smirnov ($D$)   & 0{,}027789 & 0{,}043007 & —  & \textbf{PASA}  \\
+      & Rachas ($|Z|$)             & 0{,}2531   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Autocorrelación ($|Z|$)    & 0{,}7630   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Póker ($\chi^2$)           & 50{,}3142  & 12{,}592  & 6  & \textbf{FALLA} \\
+    \midrule
+    \multirow{5}{*}{GCL (glibc)}
+      & Chi-cuadrado ($\chi^2$)    & 6{,}7200   & 16{,}919  & 9  & \textbf{PASA}  \\
+      & Kolmogorov-Smirnov ($D$)   & 0{,}020926 & 0{,}043007 & —  & \textbf{PASA}  \\
+      & Rachas ($|Z|$)             & 1{,}7718   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Autocorrelación ($|Z|$)    & 1{,}2135   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Póker ($\chi^2$)           & 4{,}9173   & 12{,}592  & 6  & \textbf{PASA}  \\
+    \midrule
+    \multirow{5}{*}{Python (MT19937)}
+      & Chi-cuadrado ($\chi^2$)    & 8{,}8200   & 16{,}919  & 9  & \textbf{PASA}  \\
+      & Kolmogorov-Smirnov ($D$)   & 0{,}031923 & 0{,}043007 & —  & \textbf{PASA}  \\
+      & Rachas ($|Z|$)             & 1{,}4554   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Autocorrelación ($|Z|$)    & 1{,}2873   & 1{,}96    & —  & \textbf{PASA}  \\
+      & Póker ($\chi^2$)           & 6{,}0516   & 12{,}592  & 6  & \textbf{PASA}  \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Resumen visual de los tests}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{tabla_tests.png}
+  \caption{Mapa de calor con el resultado de cada test por generador.
+           Verde = PASA, Rojo = FALLA ($\alpha = 0{,}05$).}
+  \label{fig:tabla_tests}
+\end{figure}
+
+\subsection{Histogramas de uniformidad}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{hist_uniformidad.png}
+  \caption{Histogramas de frecuencia con $k=10$ intervalos iguales en $[0,1)$.
+           La línea discontinua indica la frecuencia esperada ($n/k = 100$).}
+  \label{fig:histogramas}
+\end{figure}
+
+Los tres generadores muestran distribuciones visualmente similares.  El GCL
+y el MT exhiben barras más uniformes, mientras que los Cuadrados Medios
+presentan ligeras irregularidades en las frecuencias de los intervalos
+extremos, aunque dentro del margen tolerable para el test $\chi^2$.
+
+\subsection{Función de distribución acumulada empírica}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.72\textwidth]{ecdf.png}
+  \caption{ECDF de los tres generadores comparada con la distribución
+           teórica $F(x)=x$.  Las tres curvas se superponen casi
+           perfectamente sobre la diagonal.}
+  \label{fig:ecdf}
+\end{figure}
+
+La Figura~\ref{fig:ecdf} confirma visualmente el test KS: las tres ECDFs
+se adhieren a la teórica sin superar el umbral $D^* = 0{,}043$.
+
+\subsection{Diagrama de dispersión serial}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{scatter_serial.png}
+  \caption{Diagrama $X_n$ vs $X_{n+1}$ para los primeros 500 pares.
+           Una nube uniforme sin estructura indica independencia serial.}
+  \label{fig:scatter}
+\end{figure}
+
+La nube de puntos del GCL y del MT cubre uniformemente el cuadrado
+$[0,1)^2$ sin estructuras apreciables, indicando buena independencia
+serial.  Los Cuadrados Medios muestran una distribución también densa,
+aunque con una leve concentración diagonal que es consistente con la
+autocorrelación no significativa observada.
+
+\subsection{Secuencia temporal}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{serie_temporal.png}
+  \caption{Primeros 200 valores generados por cada método.  Se aprecia
+           el comportamiento errático esperado en todos los generadores.}
+  \label{fig:serie}
+\end{figure}
+
+\subsection{Autocorrelación para distintos retardos}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{autocorrelacion.png}
+  \caption{Coeficiente de autocorrelación $r_\ell$ para retardos
+           $\ell = 1, \ldots, 50$.  Las líneas discontinuas marcan el
+           límite $\pm 1{,}96/\sqrt{n}$ al nivel $\alpha=0{,}05$.}
+  \label{fig:autocorr}
+\end{figure}
+
+La Figura~\ref{fig:autocorr} muestra que para todos los generadores la
+gran mayoría de los coeficientes se encuentran dentro de la banda de
+confianza.  En los Cuadrados Medios se aprecian picos esporádicos
+marginalmente fuera del límite en algunos retardos, lo que es consistente
+con el comportamiento irregular ya detectado por el test del Póker.
+
+\subsection{Estadísticos descriptivos}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{estadisticos.png}
+  \caption{Media muestral y desviación estándar de cada generador,
+           comparadas con los valores teóricos de $U[0,1)$:
+           $\mu = 0{,}5$ y $\sigma = 1/\!\sqrt{12} \approx 0{,}2887$.}
+  \label{fig:estadisticos}
+\end{figure}
+
+Los tres generadores producen medias y desviaciones estándar muy próximas
+a los valores teóricos de la distribución uniforme, lo que proporciona
+evidencia adicional de la bondad de ajuste.
+
+% ── 5. Análisis comparativo ───────────────────────────────────────────────────
+\section{Análisis comparativo}
+
+\subsection{Cuadrados Medios}
+
+El método de los Cuadrados Medios supera los cuatro tests ``clásicos''
+(Chi-cuadrado, KS, Rachas y Autocorrelación), pero \textbf{falla el test
+del Póker} con un estadístico de $50{,}31$, muy por encima del crítico
+$12{,}59$.  Esto indica que la distribución de los dígitos decimales no es
+uniforme: hay una sobrerepresentación de ciertas categorías (en particular
+``Quintilla'' y ``Trío''), lo que evidencia que los Cuadrados Medios
+producen regiones del espacio $[0,1)$ más visitadas que otras cuando se
+consideran bloques de cinco valores.
+
+Esta debilidad es bien conocida y motivó históricamente el desarrollo de
+generadores más sofisticados.  El método es válido para demostraciones
+educativas pero no para simulaciones serias.
+
+\subsection{GCL (glibc/POSIX)}
+
+El GCL con parámetros POSIX supera los cinco tests aplicados.  El test de
+Rachas con $|Z|=1{,}77$ (próximo al límite $1{,}96$) sugiere que la
+secuencia presenta algo de estructura serial, consistente con la
+correlación lineal inherente a los GCLs en dimensiones altas.  No
+obstante, para $n=1000$ y los tests empleados, el comportamiento es
+estadísticamente aceptable.
+
+Los GCLs tienen período máximo $m = 2^{31} \approx 2{,}1 \times 10^9$,
+suficiente para la mayoría de las simulaciones de pequeña y mediana escala.
+
+\subsection{Mersenne Twister (Python)}
+
+El MT supera todos los tests con amplios márgenes.  Es el generador de
+mayor calidad de los tres evaluados y el más adecuado para simulaciones de
+Monte Carlo de propósito general.  Su único inconveniente para aplicaciones
+criptográficas es que su estado interno puede ser reconstruido a partir de
+624 valores consecutivos~\cite{matsumoto1998}, pero esto no es relevante
+en el contexto de simulación estocástica.
+
+% ── 6. Implementación en Python ───────────────────────────────────────────────
+\section{Implementación en Python}
+
+A continuación se muestran los fragmentos más relevantes del código.
+El archivo completo se entrega junto con este informe.
+
+\subsection{Generador de Cuadrados Medios}
+
+\begin{lstlisting}[caption={Clase MiddleSquares},label={lst:ms}]
+class MiddleSquares:
+    def __init__(self, seed: int = 12345, digits: int = 8):
+        self.digits  = digits
+        self.modulus = 10 ** digits
+        self.state   = int(str(seed).zfill(digits)[:digits])
+
+    def next(self) -> float:
+        sq   = self.state ** 2
+        sq_s = str(sq).zfill(2 * self.digits)
+        start = (len(sq_s) - self.digits) // 2
+        self.state = int(sq_s[start : start + self.digits])
+        return self.state / self.modulus
+\end{lstlisting}
+
+\subsection{Generador Congruencial Lineal}
+
+\begin{lstlisting}[caption={Clase GCL},label={lst:gcl}]
+class GCL:
+    def __init__(self, seed=12345,
+                 a=1_103_515_245, c=12_345, m=2**31):
+        self.a, self.c, self.m = a, c, m
+        self.state = seed % m
+
+    def next(self) -> float:
+        self.state = (self.a * self.state + self.c) % self.m
+        return self.state / self.m
+\end{lstlisting}
+
+\subsection{Test Chi-cuadrado (extracto)}
+
+\begin{lstlisting}[caption={Test de bondad de ajuste Chi-cuadrado},label={lst:chi2}]
+def test_chi_cuadrado(data, k=10, alpha=0.05):
+    n, Ei = len(data), len(data) / k
+    counts = [0] * k
+    for x in data:
+        counts[min(int(x * k), k - 1)] += 1
+    chi2_stat = sum((obs - Ei)**2 / Ei for obs in counts)
+    chi2_crit = 16.919  # chi2(9, 0.05)
+    return {"estadistico": chi2_stat, "critico": chi2_crit,
+            "resultado": "PASA" if chi2_stat < chi2_crit else "FALLA"}
+\end{lstlisting}
+
+% ── 7. Conclusiones ───────────────────────────────────────────────────────────
+\section{Conclusiones}
+
+Los experimentos realizados permiten extraer las siguientes conclusiones:
+
+\begin{enumerate}
+
+  \item \textbf{Los Cuadrados Medios son insuficientes para simulación.}
+        A pesar de pasar los tests de uniformidad global (Chi-cuadrado y
+        KS) y los de independencia (Rachas y Autocorrelación), falla el
+        test del Póker con un estadístico cuatro veces superior al crítico,
+        revelando una distribución no uniforme en la estructura de dígitos.
+        Esto lo inhabilita para simulaciones que requieren muestras de
+        alta dimensión o bloques de números correlacionados.
+
+  \item \textbf{El GCL con parámetros POSIX es aceptable para simulación
+        de uso general.}  Supera los cinco tests aplicados.  Su
+        implementación es trivial y su costo computacional es mínimo
+        (una multiplicación y una suma módulo $2^{31}$).  La ligera
+        tensión en el test de Rachas ($|Z|=1{,}77$) recuerda que los
+        GCLs presentan correlaciones en dimensiones altas, limitación
+        que los hace inadecuados para métodos de Monte Carlo en espacios
+        de alta dimensión.
+
+  \item \textbf{El Mersenne Twister es la opción óptima.}  Supera todos
+        los tests con los mejores márgenes y ofrece el período más largo
+        ($2^{19937}-1$).  Para cualquier simulación implementada en Python
+        se recomienda el uso de \texttt{random.random()} o
+        \texttt{numpy.random}, que internamente usan MT19937.
+
+  \item \textbf{Los tests estadísticos son complementarios.}  Ningún test
+        aislado es suficiente para certificar la calidad de un generador:
+        los Cuadrados Medios pasaron cuatro de los cinco tests.  Se
+        recomienda aplicar al menos cuatro pruebas independientes, como
+        las aquí presentadas.
+
+  \item \textbf{La semilla determina reproducibilidad.}  Fijar la semilla
+        permite reproducir exactamente cualquier simulación, propiedad
+        fundamental para la validación y depuración de modelos.
+
+\end{enumerate}
+
+% ── Referencias ───────────────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{knuth1997}
+  Knuth, D.\ E.\ (1997).
+  \textit{The Art of Computer Programming, Vol.~2: Seminumerical Algorithms}
+  (3rd ed.).
+  Addison-Wesley.
+
+\bibitem{metropolis1987}
+  Metropolis, N.\ (1987).
+  The beginning of the Monte Carlo method.
+  \textit{Los Alamos Science}, Special Issue, 125--130.
+
+\bibitem{lehmer1951}
+  Lehmer, D.\ H.\ (1951).
+  Mathematical methods in large-scale computing units.
+  In \textit{Proceedings of the 2nd Symposium on Large-Scale Digital
+  Calculating Machinery}, pp.~141--146.
+  Harvard University Press.
+
+\bibitem{hull1962}
+  Hull, T.\ E.\ \& Dobell, A.\ R.\ (1962).
+  Random number generators.
+  \textit{SIAM Review}, 4(3), 230--254.
+
+\bibitem{matsumoto1998}
+  Matsumoto, M.\ \& Nishimura, T.\ (1998).
+  Mersenne Twister: A 623-dimensionally equidistributed uniform
+  pseudo-random number generator.
+  \textit{ACM Transactions on Modeling and Computer Simulation},
+  8(1), 3--30.
+
+\bibitem{massey1951}
+  Massey, F.\ J.\ Jr.\ (1951).
+  The Kolmogorov-Smirnov test for goodness of fit.
+  \textit{Journal of the American Statistical Association},
+  46(253), 68--78.
+
+\bibitem{torres2026}
+  Torres, J.\ I.\ (2026).
+  \textit{TP 2.1 --- Generadores Pseudoaleatorios}.
+  Universidad Tecnológica Nacional -- FRRO, Rosario.
+
+\bibitem{tereom2018}
+  Organización de Estadística Computacional (2018).
+  Números pseudoaleatorios.
+  Recuperado de:
+  \url{https://tereom.github.io/est-computacional-2018/numeros-pseudoaleatorios.html}
+
+\bibitem{randomorg}
+  Haahr, M.\ (2005).
+  \textit{Statistical Analysis of RANDOM.ORG}.
+  Recuperado de:
+  \url{https://www.random.org/analysis/Analysis2005.pdf}
+
+\end{thebibliography}
+
+\end{document}
